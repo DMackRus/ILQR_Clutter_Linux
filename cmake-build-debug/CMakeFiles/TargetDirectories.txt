@@ -1,0 +1,3 @@
+/home/david/projects/iLQR_Clutter_Linux/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/david/projects/iLQR_Clutter_Linux/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/david/projects/iLQR_Clutter_Linux/cmake-build-debug/CMakeFiles/Mujoco_controller_playground.dir

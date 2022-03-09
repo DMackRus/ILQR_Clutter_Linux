@@ -1,0 +1,9 @@
+Wed Mar  9 16:50:24 2022
+WARNING: Unknown warning type Time = 0.0000.
+
+Wed Mar  9 16:50:26 2022
+WARNING: Pre-allocated constraint buffer is full. Increase njmax above 500. Time = 10.0000.
+
+Wed Mar  9 16:57:14 2022
+WARNING: Unknown warning type Time = 0.0000.
+

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="Mujoco_controller_playground"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;CMake Files\..\;CMake Files\..\..\;CMake Files\..\..\Libraries\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/home/david/projects/Mujoco_controller_playground/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/home/david/projects/Mujoco_controller_playground/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/home/david/projects/Mujoco_controller_playground/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="Mujoco_controller_playground">
+				<Option output="/home/david/projects/Mujoco_controller_playground/Mujoco_controller_playground" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/david/projects/Mujoco_controller_playground"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/david/projects/Mujoco_controller_playground/mujoco/include"/>
+					<Add directory="//include/eigen3"/>
+					<Add directory="/home/david/Libraries/eigen-3.4.0"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 Mujoco_controller_playground"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="Mujoco_controller_playground/fast">
+				<Option output="/home/david/projects/Mujoco_controller_playground/Mujoco_controller_playground" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/david/projects/Mujoco_controller_playground"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/david/projects/Mujoco_controller_playground/mujoco/include"/>
+					<Add directory="//include/eigen3"/>
+					<Add directory="/home/david/Libraries/eigen-3.4.0"/>
+					<Add directory="/usr/include/c++/7"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
+					<Add directory="/usr/include/c++/7/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 Mujoco_controller_playground/fast"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/david/projects/Mujoco_controller_playground/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/Utility/MujocoController/MujocoController.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/Utility/MujocoController/MujocoController.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/Utility/MujocoController/MujocoUI.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/Utility/MujocoController/MujocoUI.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/iLQR/iLQR.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/iLQR/iLQR.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/iLQR/iLQR_funcs.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/iLQR/iLQR_funcs.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/iLQR/ilqrCore.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/iLQR/ilqrCore.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/ikValidater/ikValidater.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/ikValidater/ikValidater.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/ikfast/ikfast.h">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/ikfast/ikfastPanda.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/main.cpp">
+			<Option target="Mujoco_controller_playground"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/../../Libraries/Eigen3Config.cmake">
+			<Option virtualFolder="CMake Files\..\..\Libraries\"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/../../Libraries/Eigen3ConfigVersion.cmake">
+			<Option virtualFolder="CMake Files\..\..\Libraries\"/>
+		</Unit>
+		<Unit filename="/home/david/projects/Mujoco_controller_playground/../../Libraries/Eigen3Targets.cmake">
+			<Option virtualFolder="CMake Files\..\..\Libraries\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>
