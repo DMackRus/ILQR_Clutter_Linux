@@ -10,12 +10,11 @@
  *
  *
  */
-float horizonLength = 10.0; // seconds
+float horizonLength = 20.0; // seconds
 float dt = 0.04; // time between controls changing
 int numControls = horizonLength / dt; // number of controls needed as per horizon length and time step
 int mujoco_steps_per_dt = (dt / MUJOCO_TIMESTEP) + 1; // Number of mj_steps needed per control time step
-int linearising_num_sim_steps = 2;  // How many mujoco steps to use for linearising
-int num_controls_per_linearisation = 1;
+int linearising_num_sim_steps = 100;  // How many mujoco steps to use for linearising
 bool alphaSearchEnabled = false;     // Whether alpha search is enabled to maximise optimisation at each forwards pass
 float maxLamda = 10000;             // Maximum lambda before canceliing optimisation
 float minLamda = 0.00001;            // Minimum lamda
@@ -23,15 +22,16 @@ float lamdaFactor = 10;             // Lamda multiplicative factor
 float epsConverge = 0.001;
 bool oneSidedFiniteDiff = true;
 bool costFunctionFD = false;
+m_dof nextControlSequence;
 
 
-//float controlCost[DOF] = {0.0001, 0.0001, 0.0001, 0.0001, 0.00005, 0.00005, 0.00005};
+//float controlCost[DOF] = {0.001, 0.001, 0.001, 0.001, 0.0005, 0.0005, 0.0005};
 float controlCost[DOF] = {0, 0, 0, 0, 0, 0, 0};
 float stateCosts[NUM_STATES] = {0, 0, 0, 0, 0, 0, 0,
                                 0.1, 0.1, 0.1, 0.1, 0.01, 0.01, 0.01,
                                     100, 100};
 //float termStateCosts[DOF] = {100, 100, 100, 100, 10, 10, 10};
-float termStateCosts[DOF] = {1, 1, 1, 1, 1, 1, 1};
+float termStateCosts[DOF] = {1, 1, 1, 1, 1, 100, 100};
 float accelCosts[DOF] = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001};
 
 /**************************************************************************
@@ -67,26 +67,32 @@ extern MujocoController *globalMujocoController;
 // This function calculates the A and B matrices using finite differencing
 void lineariseDynamics(Ref<m_state> currentState, Ref<m_dof> currentControls, Ref<MatrixXf> A, Ref<MatrixXf> B){
 
-    float epsState[NUM_STATES] = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.1, 0.1};
-    float epsControls[DOF] = {0.1,0.1,0.1,0.1,0.1,0.1,0.1};
+//    float epsState[NUM_STATES] = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.1, 0.1};
+    float epsState[NUM_STATES] = {0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.0001, 0.0001, 0.0001};
+    float epsControls[DOF] = {1e-3,1e-3,1e-3,0.5,0.5,1e-3,0.5};
+    float eps_state = 1e-5;
+    float eps_control = 1e-5;
+    float eps = 1e-6;
+    //float epsControls[DOF] = {0.001,0.001,0.001,0.001,0.001,0.001,0.001};
 
     auto linDynStart = high_resolution_clock::now();
     int microSecs_Loading = 0;
     auto startTimerLoading = high_resolution_clock::now();
     auto stopTimerLoading = high_resolution_clock::now();
     auto loadingDuration = duration_cast<microseconds>(stopTimerLoading - startTimerLoading);
-    int numberMujocoStepsNeeded = linearising_num_sim_steps;
+    //int numberMujocoStepsNeeded = linearising_num_sim_steps;
+    int numberMujocoStepsNeeded = 1;
 
     // Make a copy of the current state
     VectorXf X_copy = currentState.replicate(1, 1);
 
-    // calculate A matrix
+    // calculate the A matrix
     for(int i = 0; i < NUM_STATES; i++){
         // Create an incremented and decremented version of current state
         VectorXf X_inc = X_copy.replicate(1,1);
-        X_inc(i) += epsState[i];
+        X_inc(i) += eps_state;
         VectorXf X_dec = X_copy.replicate(1, 1);
-        X_dec(i) -= epsState[i];
+        X_dec(i) -= eps_state;
 
         // apply same controls and observe how state variables change with respect to changing individual state variables
         ArrayXf stateInc(NUM_STATES);
@@ -102,6 +108,8 @@ void lineariseDynamics(Ref<m_state> currentState, Ref<m_dof> currentControls, Re
 //        loadingDuration = duration_cast<microseconds>(stopTimerLoading - startTimerLoading);
 //        microSecs_Loading += loadingDuration.count();
         stepSimulation(X_inc, currentControls, _inc, stateInc, numberMujocoStepsNeeded);
+        cout << "----------------- x dot increment --------------------- " << endl;
+        cout << _inc << endl;
 //        startTimerLoading = high_resolution_clock::now();
 
         globalMujocoController->loadSimulationState(baseStateIndex);
@@ -111,13 +119,20 @@ void lineariseDynamics(Ref<m_state> currentState, Ref<m_dof> currentControls, Re
 //        loadingDuration = duration_cast<microseconds>(stopTimerLoading - startTimerLoading);
 //        microSecs_Loading += loadingDuration.count();
         stepSimulation(X_dec, currentControls, _dec, stateDec, numberMujocoStepsNeeded);
+        cout << "----------------- x dot decrement --------------------- " << endl;
+        cout << _dec << endl;
 
         // calculate the gradient
         for(int j = 0; j < NUM_STATES; j++){
             // CHECK, needs double checking especially with mujoco
-            A(j, i) = (stateInc(j) - stateDec(j) ) / (2 * epsState[i]);
+            A(j, i) = (_inc(j) - _dec(j) ) / (2 * eps_state);
+
         }
+
+        int a = 1;
     }
+    cout << "------------------- A so far ---------------------" << endl;
+    cout << A << endl;
 
     VectorXf U_copy = currentControls.replicate(1, 1);
     for(int i = 0; i < DOF; i++){
@@ -140,6 +155,8 @@ void lineariseDynamics(Ref<m_state> currentState, Ref<m_dof> currentControls, Re
 //        loadingDuration = duration_cast<microseconds>(stopTimerLoading - startTimerLoading);
 //        microSecs_Loading += loadingDuration.count();
         stepSimulation(X_copy, U_inc, _inc, stateInc, numberMujocoStepsNeeded);
+        cout << "----------------- x dot increment --------------------- " << endl;
+        cout << _inc << endl;
 
 //        startTimerLoading = high_resolution_clock::now();
 
@@ -151,11 +168,17 @@ void lineariseDynamics(Ref<m_state> currentState, Ref<m_dof> currentControls, Re
 //        microSecs_Loading += loadingDuration.count();
 
         stepSimulation(X_copy, U_dec, _dec, stateDec, numberMujocoStepsNeeded);
+        cout << "----------------- x dot decrement --------------------- " << endl;
+        cout << _dec << endl;
 
         for(int j = 0; j < NUM_STATES; j++){
-            B(j, i) = (stateInc(j) - stateDec(j))/(2 * epsControls[i]);
+            B(j, i) = (_inc(j) - _dec(j))/(2 * epsControls[i]);
         }
+        cout << "------------------- B so far ---------------------" << endl;
+        cout << B << endl;
+        int b = 1;
     }
+
     globalMujocoController->loadSimulationState(baseStateIndex);
 
 //    auto linDynStop = high_resolution_clock::now();
@@ -167,16 +190,56 @@ void lineariseDynamics(Ref<m_state> currentState, Ref<m_dof> currentControls, Re
 
 void stepSimulation(const Ref<m_state> currentState, const Ref<m_dof> U, Ref<m_state> Xnew, Ref<m_state> Xdot, int numSimSteps){
 
-    globalMujocoController->setNextControlSequence(U);
+    m_dof acc = globalMujocoController->returnRobotAccelerations();
+    m_dof vel = globalMujocoController->returnRobotVelocities();
+    m_dof pos = globalMujocoController->returnRobotConfiguration();
+
+//    cout << "robot acc before:" << endl;
+//    cout << acc << endl;
+//    cout << "robot vel before:" << endl;
+//    cout << vel << endl;
+//    cout << "robot pos before:" << endl;
+//    cout << pos << endl;
+
+    nextControlSequence = U;
     for(int i = 0; i < numSimSteps; i++){
         globalMujocoController->step();
     }
 
     Xnew = globalMujocoController->returnSystemState();
+    acc = globalMujocoController->returnRobotAccelerations();
+    vel = globalMujocoController->returnRobotVelocities();
+    pos = globalMujocoController->returnRobotConfiguration();
+
+//    cout << "old state" << endl;
+//    cout << currentState << endl;
+//    cout << "new state " << endl;
+//    cout << Xnew << endl;
+
+//    cout << "robot acc after:" << endl;
+//    cout << acc << endl;
+//    cout << "robot vel after:" << endl;
+//    cout << vel << endl;
+//    cout << "robot pos after:" << endl;
+//    cout << pos << endl;
+
+    m_state x_dot_differently;
 
     for(int i = 0; i < NUM_STATES; i++) {
         Xdot(i) = (Xnew(i) - currentState(i)) / (MUJOCO_TIMESTEP * numSimSteps);
+
     }
+
+    for(int i = 0; i < DOF; i++){
+        Xdot(i) = vel(i);
+        Xdot(i + 7) = acc(i);
+    }
+//    cout << "x dot is" << endl;
+//    cout << Xdot << endl;
+//    cout << "x dot alternate method" << endl;
+//    cout << x_dot_differently << endl;
+    int a = 1;
+
 }
 
 float rollOutTrajectory(const Ref<const VectorXf> X0, m_state *X, m_dof *U, int numControls){
@@ -199,7 +262,7 @@ float rollOutTrajectory(const Ref<const VectorXf> X0, m_state *X, m_dof *U, int 
         cost += (l * dt);
 
         // Step simulation set number of times
-        globalMujocoController->setNextControlSequence(U[i]);
+        nextControlSequence = U[i];
         for(int j = 0; j < mujoco_steps_per_dt; j++){
             globalMujocoController->step();
         }
@@ -261,9 +324,6 @@ float immediateCostAndDerivitives(Ref<VectorXf> l_x, Ref<MatrixXf> l_xx, Ref<Vec
         l_xx = Q;
     }
 
-
-
-
 //    cout << "X_diff was" << endl;
 //    cout << X_diff << endl;
 //
@@ -291,23 +351,30 @@ float terminalCost(Ref<VectorXf> l_x, Ref<MatrixXf> l_xx, const Ref<const Vector
     float cost;
     float eps = 1e-1;
 
+    m_state X_diff = X - X_desired;
     cost = calcStateCost(X, X, true);
 
-    l_x = costFirstOrderDerivitives(X, X, true);
+    if(costFunctionFD){
+        l_x = costFirstOrderDerivitives(X, X, true);
 
-    for(int i = 0; i < NUM_STATES; i++){
-        m_state X_inc = X.replicate(1, 1);
-        m_state X_dec = X.replicate(1, 1);
+        for(int i = 0; i < NUM_STATES; i++){
+            m_state X_inc = X.replicate(1, 1);
+            m_state X_dec = X.replicate(1, 1);
 
-        X_inc(i) += eps;
-        X_dec(i) -= eps;
+            X_inc(i) += eps;
+            X_dec(i) -= eps;
 
-        m_state l_x_inc = costFirstOrderDerivitives(X_inc, X_inc, true);
-        m_state l_x_dec = costFirstOrderDerivitives(X_dec, X_inc, true);
+            m_state l_x_inc = costFirstOrderDerivitives(X_inc, X_inc, true);
+            m_state l_x_dec = costFirstOrderDerivitives(X_dec, X_inc, true);
 
-        for(int j = 0 ; j < NUM_STATES; j++){
-            l_xx(j, i) = (l_x_inc(j) - l_x_dec(j)) / (2 * eps);
+            for(int j = 0 ; j < NUM_STATES; j++){
+                l_xx(j, i) = (l_x_inc(j) - l_x_dec(j)) / (2 * eps);
+            }
         }
+    }
+    else{
+        l_x = X_diff.transpose() * Q_term;
+        l_xx = Q_term;
     }
 
     return cost;
@@ -375,35 +442,7 @@ float calcControlCost(const Ref<const m_dof> U){
     return controlCost;
 }
 
-void warmStartControls(m_dof *U, Ref<m_state> X0){
-    m_state stateDiff = X0 - X_desired;
 
-    for(int i = 0; i < DOF - 3; i++){
-        float startTorque = stateDiff(i) * 40;
-        if(startTorque > torqueLims[i]) startTorque = torqueLims[i];
-        if(startTorque < -torqueLims[i]) startTorque = -torqueLims[i];
-        float torqueChangePerControl = startTorque / numControls;
-        U[0](i) = startTorque;
-        float currentTorque = startTorque;
-        for(int j = 0; j < numControls; j++){
-            U[j](i) = currentTorque;
-            currentTorque = currentTorque - torqueChangePerControl;
-        }
-    }
-
-    for(int i = DOF - 3; i < DOF ; i++){
-        float startTorque = stateDiff(i) * 5;
-        if(startTorque > torqueLims[i]) startTorque = torqueLims[i];
-        if(startTorque < -torqueLims[i]) startTorque = -torqueLims[i];
-        float torqueChangePerControl = startTorque / numControls;
-        U[0](i) = startTorque;
-        float currentTorque = startTorque;
-        for(int j = 0; j < numControls; j++){
-            U[j](i) = currentTorque;
-            currentTorque = currentTorque - torqueChangePerControl;
-        }
-    }
-}
 
 void initCostMatrices(){
 
@@ -416,8 +455,8 @@ void initCostMatrices(){
         Q(i, i) = stateCosts[i];
     }
     Q_term = Q.replicate(1, 1);
-    for(int i = 0; i < DOF; i++){
-        Q_term(i, i) *= termStateCosts[i];
+    for(int i = 0; i < NUM_STATES; i++){
+        Q_term(i, i) *= 100;
     }
     Z.setIdentity();
     for(int i = 0; i < DOF; i++){
@@ -428,7 +467,7 @@ void initCostMatrices(){
 void initDesiredState(){
     X_desired << 0, 0, 0, -0.4, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0,
-                 0.7, 0;
+                 0.9, 0;
 
     // Currently its the last two entries in the desired state that matter, which is the x and y position of the cube
 

@@ -62,23 +62,10 @@ public:
     int robotBodyID[11];
     int _resetLevel = 0;
     std::vector<mjData*> _mujocoStates;
-    m_dof* controlSequence;
-    m_dof nextControlSequence;
-    int controlCounter = 0;
-    int numControlsPerTrajectory;
-    int mujocoTimesStepsPerControl;
-    int mujocoTimeStepCounter = 0;
+
     bool resetSimFlag = false;
-    int controlState = 0;
-    PIDController positionPID[NUM_JOINTS];
-    m_dof desiredJointAngles;
 
-    pose desiredEndEffectorPos;
-    pose startEndEffectorPos;
-    pose diffPoseStartDesired;
-    Vector3d linearInterpolationDesiredForce;
-
-    MatrixXd J_COMi;// = MatrixXd::Zero(3, _model->nv); //COM Jacobian of body i with shape 3x number of degrees of freedom
+    MatrixXd J_COMi;
 
     mjModel* returnModel();
     mjData* returnCurrentModelData();
@@ -101,8 +88,6 @@ public:
     void setRobotAccelerations(const Ref<const VectorXf> jointAccelerations);
     ArrayXf returnRobotAccelerations();
 
-    void setDesiredRobotConfiguration(const Ref<const m_dof> desiredConfiguration);
-    void setDesiredEndEffectorPose(pose _desiredEndEffectorPose);
     struct pose returnEndEffectorPos();
 
     bool isConfigInCollision(m_dof configuration);
@@ -114,23 +99,12 @@ public:
     void loadSimulationState(int stateIndex);
     void resetSimulationToStart();
 
-
-    void setNextControlSequence(const Ref<const VectorXf> U);
     void step();
-    void iLQRSetControlSequence(m_dof *U, int numControls);
-    void initialiseLinearInterpolation(pose _startPose, pose _endPose, float forceMagnitude);
-
 
     Eigen::MatrixXd calculateJacobian(int bodyId);
+    int returnModelID(const std::string& input);
 };
 
-void  PIDController_Init(PIDController* pid, float Kp, float Ki, float Kd);
-float PIDController_Update(PIDController* pid, float setpoint, float measurement);
-void myController(const mjModel *m, mjData* d);
-void initialseController();
 
-void saveControls(m_dof lastControls, bool fin);
-bool poseAchieved(pose desiredPose, pose currentPose);
-void initialiseLinearInterpolation(pose _startPose, pose _endPose, float forceMagnitude);
 
 #endif //CLIONS_PROJECTS_MUJOCOCONTROLLER_H

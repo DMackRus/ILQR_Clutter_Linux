@@ -13,7 +13,6 @@ extern int initStateIndex;
 extern int baseStateIndex;
 extern float horizonLength;
 extern int linearising_num_sim_steps;
-extern int num_controls_per_linearisation;
 extern bool alphaSearchEnabled;
 extern float maxLamda;
 extern float minLamda;
@@ -36,7 +35,6 @@ void differentiateDynamics(m_state *X, m_dof *U, m_state_state *f_x, m_state_dof
     MatrixXf A = ArrayXXf::Zero(NUM_STATES, NUM_STATES);
     MatrixXf B = ArrayXXf::Zero(NUM_STATES, DOF);
     // Linearise the dynamics
-    int lineariseCounter = num_controls_per_linearisation;
     for(int t = 0; t < numControls; t++){
         // Calculate linearised dynamics for current time step via finite differencing
         globalMujocoController->setSystemState(X[t]);
@@ -44,11 +42,11 @@ void differentiateDynamics(m_state *X, m_dof *U, m_state_state *f_x, m_state_dof
         globalMujocoController->saveMujocoState();
         lineariseDynamics(X[t], U[t], A, B);
 
-        A *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
-        B *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
+//        A *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
+//        B *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
 
-        f_x[t] = I + (A * dt);
-        f_u[t] = (B * dt);
+        f_x[t] = A;
+        f_u[t] = B;
 
         l[t] = immediateCostAndDerivitives(l_x[t], l_xx[t], l_u[t], l_uu[t], X[t], X[t+1], U[t]);
 
@@ -68,11 +66,11 @@ void differentiateDynamics(m_state *X, m_dof *U, m_state_state *f_x, m_state_dof
 
     }
 
-//    l[numControls] = terminalCost(l_x[numControls], l_xx[numControls], X[numControls]);
-//
-//    l   [numControls] *= dt;
-//    l_x [numControls] *= dt;
-//    l_xx[numControls] *= dt;
+    l[numControls] = terminalCost(l_x[numControls], l_xx[numControls], X[numControls]);
+
+    l   [numControls] *= dt;
+    l_x [numControls] *= dt;
+    l_xx[numControls] *= dt;
 }
 
 bool backwardsPass(m_state_state *f_x, m_state_dof *f_u, float l, m_state *l_x, m_state_state *l_xx, m_dof *l_u, m_dof_dof *l_uu, m_dof *k,  m_dof_state *K){

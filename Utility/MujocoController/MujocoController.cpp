@@ -13,31 +13,15 @@ mjvPerturb pert;
 GLFWwindow* window;
 MujocoController* globalMujocoController;
 
-int printCounter = 0;
-int controlInitCounter = 0;
-m_state testingState;
+
 
 ofstream saveControlsFile;
 
 std::string saveControlsFilename = "lastControls.csv";
-int saveControlCounter = 0;
-int numControlsToSaveCounter = 0;
-
-int _numControls = 300;
-int _mujoco_steps_per_dt = 10;
-
 
 MujocoController::MujocoController(mjModel* m, mjData* d){
     _model = m;
     _data = d;
-
-    PIDController_Init(&positionPID[0], 870, 10, 0.5);
-    PIDController_Init(&positionPID[1], 870, 10, 0.5);
-    PIDController_Init(&positionPID[2], 870, 10, 0.5);
-    PIDController_Init(&positionPID[3], 870, 10, 0.5);
-    PIDController_Init(&positionPID[4], 120, 10, 0.5);
-    PIDController_Init(&positionPID[5], 120, 10, 0.5);
-    PIDController_Init(&positionPID[6], 120, 10, 0.5);
 
     saveControlsFile.open(saveControlsFilename);
 }
@@ -59,8 +43,8 @@ void MujocoController::saveMujocoState(){
     mjData *newData = mj_makeData(_model);
     mj_copyData(newData, _model, _data);
     _mujocoStates.push_back(newData);
-
 }
+
 void MujocoController::deleteLastMujocoState(){
     mj_deleteData(_mujocoStates[1]);
     _mujocoStates.pop_back();
@@ -78,7 +62,7 @@ void MujocoController::setSystemState(const Ref<const m_state> systemState){
     setRobotConfiguration(robotConfig);
     setRobotVelocities(robotVelocities);
 
-    int boxId = mj_name2id(model, mjOBJ_BODY, "box_obstacle_1");
+    int boxId = returnModelID("box_obstacle_1");
     m_pose boxPose = returnBodyState(boxId);
 
     // Setting the x and y position to the desired state
@@ -173,14 +157,6 @@ ArrayXf MujocoController::returnRobotAccelerations(){
 
 
     return jointAccelerations;
-}
-
-void MujocoController::setDesiredRobotConfiguration(const Ref<const m_dof> desiredConfiguration){
-    desiredJointAngles = desiredConfiguration;
-}
-
-void MujocoController::setDesiredEndEffectorPose(pose _desiredEndEffectorPose){
-    desiredEndEffectorPos = _desiredEndEffectorPose;
 }
 
 bool MujocoController::isConfigInCollision(m_dof configuration) {
@@ -315,15 +291,17 @@ void MujocoController::loadSimulationState(int stateIndex){
 Eigen::MatrixXd MujocoController::calculateJacobian(int bodyId){
     Eigen::MatrixXd kinematicJacobian(3, 7);
 
-    mjtNum* J_COMi_temp = mj_stackAlloc(_data, 3*_model->nv);
+    //mjtNum* J_COMi_temp = mj_stackAlloc(_data, 3*_model->nv);
+    Matrix<double, Dynamic, Dynamic, RowMajor> J_p(3, _model->nv);
+    Matrix<double, Dynamic, Dynamic, RowMajor> J_r(3, _model->nv);
 
-    mj_jacBody(_model, _data, J_COMi_temp, NULL, bodyId);
+    mj_jacBody(_model, _data, J_p.data(), NULL, bodyId);
 
-    J_COMi = Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(J_COMi_temp, 3, _model->nv);
+    //J_COMi = Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(J_p, 3, _model->nv);
 
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 7; j++) {
-            kinematicJacobian(i, j) = J_COMi(i, j);
+            kinematicJacobian(i, j) = J_p(i, j);
             //cout << kinematicJacobian(i, j) << endl;
         }
     }
@@ -331,275 +309,6 @@ Eigen::MatrixXd MujocoController::calculateJacobian(int bodyId){
     return kinematicJacobian;
 }
 
-void MujocoController::setNextControlSequence(const Ref<const VectorXf> U){
-    nextControlSequence = U;
-}
-
-void myController(const mjModel *m, mjData *d){
-
-
-    if(globalMujocoController->controlState == ilqrSim){
-        for(int i = 0; i < NUM_JOINTS; i++) {
-            d->ctrl[i] = globalMujocoController->nextControlSequence(i);
-        }
-    }
-
-    else if(globalMujocoController->controlState == simulating){
-        for(int i = 0; i < NUM_JOINTS; i++){
-            d->ctrl[i] = globalMujocoController->controlSequence[globalMujocoController->controlCounter](i);
-        }
-        globalMujocoController->mujocoTimeStepCounter++;
-        if(globalMujocoController->mujocoTimeStepCounter >= globalMujocoController->mujocoTimesStepsPerControl){
-            globalMujocoController->mujocoTimeStepCounter = 0;
-            globalMujocoController->controlCounter++;
-        }
-
-        if(globalMujocoController->controlCounter >= globalMujocoController->numControlsPerTrajectory){
-            globalMujocoController->controlCounter = 0;
-            globalMujocoController->resetSimFlag = true;
-        }
-    }
-
-    else if(globalMujocoController->controlState == staticPos){
-        double measurments[NUM_JOINTS];
-        float newControls[NUM_JOINTS];
-
-        for (int i = 0; i < NUM_JOINTS; i++) {
-            measurments[i] = d->qpos[i];
-        }
-
-        for (int i = 0; i < NUM_JOINTS; i++) {
-            newControls[i] = PIDController_Update(&globalMujocoController->positionPID[i], globalMujocoController->desiredJointAngles(i), measurments[i]);
-        }
-
-        for (int i = 0; i < NUM_JOINTS; i++) {
-            d->ctrl[i] = newControls[i];
-        }
-
-
-    }
-    // Linearly interpolate end effector between two 3D positions whilst countering gravity
-    else if(globalMujocoController->controlState == linearInterpolation){
-        m_dof testSaveControls;
-        int endEffectorId = mj_name2id(model, mjOBJ_BODY, "franka_gripper");
-
-        MatrixXd jacobian = globalMujocoController->calculateJacobian(endEffectorId);
-        MatrixXd jacobian_T = jacobian.transpose();
-//        cout << jacobian_T << endl;
-        pose currentEndEffector = globalMujocoController->returnEndEffectorPos();
-
-        float endEffecPosDiff[3];
-        endEffecPosDiff[0] = currentEndEffector.pos.x - globalMujocoController->startEndEffectorPos.pos.x;
-        endEffecPosDiff[1] = currentEndEffector.pos.y - globalMujocoController->startEndEffectorPos.pos.y;
-        endEffecPosDiff[2] = currentEndEffector.pos.z - globalMujocoController->startEndEffectorPos.pos.z;
-
-        float percentageAchieved[3];
-        percentageAchieved[0] = (endEffecPosDiff[0] / globalMujocoController->diffPoseStartDesired.pos.x) * 100;
-        percentageAchieved[1] = (endEffecPosDiff[1] / globalMujocoController->diffPoseStartDesired.pos.y) * 100;
-        percentageAchieved[2] = (endEffecPosDiff[2] / globalMujocoController->diffPoseStartDesired.pos.z) * 100;
-
-        Vector3d correctiveEndEffecForce;
-
-        correctiveEndEffecForce(0) = (globalMujocoController->linearInterpolationDesiredForce(0));
-        correctiveEndEffecForce(1) = (globalMujocoController->linearInterpolationDesiredForce(1));
-        correctiveEndEffecForce(2) = (globalMujocoController->linearInterpolationDesiredForce(2));
-
-//        correctiveEndEffecForce(0) = 0;
-//        correctiveEndEffecForce(1) = -50;
-//        correctiveEndEffecForce(2) = 0;
-
-        // if the end effector is below correct height
-        float redFactor = 100 * endEffecPosDiff[2];
-        correctiveEndEffecForce(2) -= redFactor;
-        //correctiveEndEffecForce(0) += redFactor;
-        //cout << "corrective force z axis: " << redFactor << endl;
-
-
-//        for(int i = 0; i < 2; i++){
-//            float percentageDiff = (percentageAchieved[i+1] - percentageAchieved[0]);
-//            if(percentageDiff > 2){
-//                correctiveEndEffecForce(i+1) = globalMujocoController->linearInterpolationDesiredForce(i+1) + (5 * percentageDiff);
-//            }
-//            else if(percentageDiff < -2){
-//                globalMujocoController->linearInterpolationDesiredForce(i+1) - (5 * percentageDiff);
-//            }
-//            else{
-//                correctiveEndEffecForce(i+1) = globalMujocoController->linearInterpolationDesiredForce(i+1);
-//            }
-//
-//        }
-
-        VectorXd desiredJointTorques = jacobian_T * correctiveEndEffecForce;
-        //int pointlessVariable = 0;
-
-        for( int i = 0; i < NUM_JOINTS; i++){
-            d->ctrl[i] = d->qfrc_bias[i] + desiredJointTorques(i);
-            testSaveControls(i) = d->qfrc_bias[i] + desiredJointTorques(i);
-        }
-
-        saveControlCounter--;
-        if(saveControlCounter <= 0){
-            saveControlCounter = _mujoco_steps_per_dt;
-            numControlsToSaveCounter++;
-            if(numControlsToSaveCounter >= _numControls){
-                saveControls(testSaveControls, true);
-                if(poseAchieved(globalMujocoController->desiredEndEffectorPos, currentEndEffector)){
-                    globalMujocoController->controlState = staticCalc;
-                }
-            }
-            else{
-                saveControls(testSaveControls, false);
-            }
-        }
-    }
-    else if(globalMujocoController->controlState == staticCalc){
-        for( int i = 0; i < NUM_JOINTS; i++){
-            d->ctrl[i] = d->qfrc_bias[i];
-        }
-    }
-    else{
-
-    }
-}
-
-void MujocoController::iLQRSetControlSequence(m_dof *U, int numControls){
-
-    controlSequence = new m_dof[numControls];
-    for(int i = 0; i < numControls; i++){
-        controlSequence[i] = U[i];
-    }
-}
-
-void initialseController(){
-    mjcb_control = myController;
-
-}
-
-void  PIDController_Init(PIDController* pid, float Kp, float Ki, float Kd) {
-    pid->integrator = 0.0f;
-    pid->prevError = 0.0f;
-    pid->differentiator = 0.0f;
-    pid->prevMeasurement = 0.0f;
-    pid->out = 0.0f;
-
-    pid->Kp = Kp;
-    pid->Ki = Ki;
-    pid->Kd = Kd;
-
-    pid->tau = 0.002f;
-    pid->T = 0.002f;
-
-    pid->limMinInt = -100.0f;
-    pid->limMaxInt = 100.0f;
-
-    pid->limMax = 87.0f;
-    pid->limMin = -87.0f;
-}
-
-float PIDController_Update(PIDController* pid, float setpoint, float measurement) {
-    float error = setpoint - measurement;
-
-
-    /*
-    * Proportional
-    */
-    float proportional = pid->Kp * error;
-
-
-    /*
-    * Integral
-    */
-    pid->integrator = pid->integrator + (pid->Ki * pid->T * ((error + pid->prevError) / 2));
-
-    /* Anti-wind-up via integrator clamping */
-    if (pid->integrator > pid->limMaxInt) {
-
-        pid->integrator = pid->limMaxInt;
-
-    }
-    else if (pid->integrator < pid->limMinInt) {
-
-        pid->integrator = pid->limMinInt;
-
-    }
-
-
-    /*
-    * Derivative (band-limited differentiator)
-    */
-
-    pid->differentiator = pid->Kd * ((measurement - pid->prevMeasurement) / pid->T);
-
-    //pid->differentiator = -(2.0f * pid->Kd * (measurement - pid->prevMeasurement)	/* Note: derivative on measurement, therefore minus sign in front of equation! */
-    //	+ (2.0f * pid->tau - pid->T) * pid->differentiator)
-    //	/ (2.0f * pid->tau + pid->T);
-
-
-    /*
-    * Compute output and apply limits
-    */
-    pid->out = proportional + pid->integrator + pid->differentiator;
-    //pid->out = proportional + pid->integrator;
-    //pid->out = proportional;
-
-    if (pid->out > pid->limMax) {
-
-        pid->out = pid->limMax;
-
-    }
-    else if (pid->out < pid->limMin) {
-
-        pid->out = pid->limMin;
-
-    }
-
-    /* Store error and measurement for later use */
-    pid->prevError = error;
-    pid->prevMeasurement = measurement;
-
-    /* Return controller output */
-    return pid->out;
-}
-
-void saveControls(m_dof lastControls, bool fin){
-    saveControlsFile << lastControls(0) << "," << lastControls(1) << "," << lastControls(2) << "," << lastControls(3) << "," << lastControls(4) << "," << lastControls(5) << "," << lastControls(6) << endl;
-    if(fin){
-        saveControlsFile.close();
-    }
-}
-
-void initialiseLinearInterpolation(pose _startPose, pose _endPose, float forceMagnitude){
-    globalMujocoController->startEndEffectorPos = _startPose;
-    //globalMujocoController->desiredEndEffectorPos = _endPose;
-    pose diff;
-
-    diff.pos.x = globalMujocoController->desiredEndEffectorPos.pos.x - globalMujocoController->startEndEffectorPos.pos.x;
-    diff.pos.y = globalMujocoController->desiredEndEffectorPos.pos.y - globalMujocoController->startEndEffectorPos.pos.y;
-    diff.pos.z = globalMujocoController->desiredEndEffectorPos.pos.z - globalMujocoController->startEndEffectorPos.pos.z;
-    globalMujocoController->diffPoseStartDesired = diff;
-    float magnitudeDiff = sqrt(pow(diff.pos.x,2) + pow(diff.pos.y,2) + pow(diff.pos.z,2));
-
-    diff.pos.x /= magnitudeDiff;
-    diff.pos.y /= magnitudeDiff;
-    diff.pos.z /= magnitudeDiff;
-
-    globalMujocoController->linearInterpolationDesiredForce(0) = diff.pos.x * forceMagnitude;
-    globalMujocoController->linearInterpolationDesiredForce(1) = diff.pos.y * forceMagnitude;
-    globalMujocoController->linearInterpolationDesiredForce(2) = diff.pos.z * forceMagnitude;
-    cout << "linear interpolation desired force: x:" << globalMujocoController->linearInterpolationDesiredForce(0) << " y: " << globalMujocoController->linearInterpolationDesiredForce(1) << " z: " << globalMujocoController->linearInterpolationDesiredForce(2) << endl;
-    int a = 1;
-}
-
-bool poseAchieved(pose desiredPose, pose currentPose){
-    bool poseAcheived = false;
-    float diff = sqrt(pow((desiredPose.pos.x - currentPose.pos.x),2)
-            + pow((desiredPose.pos.y - currentPose.pos.y),2)
-            + pow((desiredPose.pos.z - currentPose.pos.z),2));
-
-
-
-    if(diff < 0.1){
-        poseAcheived = true;
-    }
-    return poseAcheived;
+int MujocoController::returnModelID(const std::string& input){
+    return(mj_name2id(model, mjOBJ_BODY, input.c_str()));
 }

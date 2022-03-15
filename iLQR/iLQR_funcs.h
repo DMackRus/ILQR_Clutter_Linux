@@ -22,7 +22,6 @@ m_state costFirstOrderDerivitives(const Ref<const m_state> X, m_state X_next, bo
 float calcStateCost(const Ref<const m_state> X, const Ref<const m_state> X_next, bool terminal);
 float calcControlCost(const Ref<const m_dof> U);
 float terminalCost(Ref<VectorXf> l_x, Ref<MatrixXf> l_xx, const Ref<const VectorXf> X);
-void warmStartControls(m_dof *U, Ref<m_state> X0);
 void initCostMatrices();
 void initDesiredState();
 

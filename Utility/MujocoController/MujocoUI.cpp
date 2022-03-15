@@ -105,7 +105,6 @@ void setupMujocoWorld(){
 
     // make data corresponding to model
     mdata = mj_makeData(model);
-    initialseController();
 
     //joint1 = mj_name2id(m, mjOBJ_JOINT, "panda0_joint1");
     //joint2 = mj_name2id(m, mjOBJ_JOINT, "panda0_joint2");
@@ -148,12 +147,17 @@ void render(){
         //  this loop will finish on time for the next frame to be rendered at 60 fps.
         //  Otherwise add a cpu timer and exit this loop when it is time to render.
         mjtNum simstart = mdata->time;
-        while (mdata->time - simstart < 1.0 / 60.0)
+        while (mdata->time - simstart < 1.0 / 60.0){
             mj_step(model, mdata);
             if(globalMujocoController->resetSimFlag == true){
                 globalMujocoController->resetSimFlag = false;
                 globalMujocoController->loadSimulationState(0);
+                simstart = mdata->time;
             }
+        }
+
+
+
 
         // get framebuffer viewport
         mjrRect viewport = { 0, 0, 0, 0 };
