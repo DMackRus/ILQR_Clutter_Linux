@@ -79,14 +79,17 @@ public:
     // Directly altering or returning the state of the simulation (position, velocity, acceleration)
     void setSystemState(const Ref<const m_state> systemState);
     m_state returnSystemState();
-    void setBodyState(int bodyId, const Ref<const m_pose> pose);
+    void setBodyState(int bodyId, const Ref<const m_pose> pose, const Ref<const m_pose> velocities);
+    void setBodyPose(int bodyId, const Ref<const m_pose> pose);
+    void setBodyVel(int  bodyId, const Ref<const m_pose> vel);
     m_pose returnBodyState(int bodyId);
-    void setRobotConfiguration(const Ref<const VectorXf> configuration);
-    ArrayXf returnRobotConfiguration();
-    void setRobotVelocities(const Ref<const VectorXf> jointVelocities);
-    ArrayXf returnRobotVelocities();
-    void setRobotAccelerations(const Ref<const VectorXf> jointAccelerations);
-    ArrayXf returnRobotAccelerations();
+    m_pose returnBodyVelocities(int bodyId);
+    void setRobotConfiguration(const Ref<const m_dof> configuration);
+    m_dof returnRobotConfiguration();
+    void setRobotVelocities(const Ref<const m_dof> jointVelocities);
+    m_dof returnRobotVelocities();
+    void setRobotAccelerations(const Ref<const m_dof> jointAccelerations);
+    m_dof returnRobotAccelerations();
 
     struct pose returnEndEffectorPos();
 

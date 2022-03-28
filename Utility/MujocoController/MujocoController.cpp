@@ -64,12 +64,18 @@ void MujocoController::setSystemState(const Ref<const m_state> systemState){
 
     int boxId = returnModelID("box_obstacle_1");
     m_pose boxPose = returnBodyState(boxId);
+    m_pose boxVels = returnBodyVelocities(boxId);
+//    cout << "box pose is" << boxPose << endl;
+//    cout << "box vels is" << boxVels << endl;
+
 
     // Setting the x and y position to the desired state
     boxPose(0) = systemState(14);
     boxPose(1) = systemState(15);
+    boxVels(0) = systemState(16);
+    boxVels(1) = systemState(17);
 
-    setBodyState(boxId, boxPose);
+    setBodyState(boxId, boxPose, boxVels);
 
 }
 
@@ -82,37 +88,78 @@ m_state MujocoController::returnSystemState(){
     }
 
     int boxId = mj_name2id(model, mjOBJ_BODY, "box_obstacle_1");
-    systemState(14) = _data->xpos[3 * boxId];
-    systemState(15) = _data->xpos[(3 * boxId) + 1];
+    m_pose boxPose = returnBodyState(boxId);
+    m_pose boxVels = returnBodyVelocities(boxId);
+//    cout << "returned system state box pose: " << boxPose << endl;
+//    cout << "returned system state box vels: " << boxVels << endl;
+    systemState(14) = boxPose(0);
+    systemState(15) = boxPose(1);
+    systemState(16) = boxVels(0);
+    systemState(17) = boxVels(1);
 
     return systemState;
 }
 
-void MujocoController::setBodyState(int bodyId, const Ref<const m_pose> pose){
+void MujocoController::setBodyState(int bodyId, const Ref<const m_pose> pose, const Ref<const m_pose> velocities){
 
     // TODO extend this to work with rotations also, whether its quaternions or euler angles
 //    for(int i = 0; i < 3; i++){
 //        _data->qpos[(bodyId * 3) + i] = pose(i);
 //    }
 
+    setBodyPose(bodyId, pose);
+    setBodyVel(bodyId, velocities);
+
+}
+
+void MujocoController::setBodyPose(int bodyId, const Ref<const m_pose> pose){
     _data->qpos[16] = pose(0);
     _data->qpos[17] = pose(1);
+    _data->qpos[18] = pose(2);
+}
+
+void MujocoController::setBodyVel(int  bodyId, const Ref<const m_pose> vel){
+    _data->qvel[15] = vel(0);
+    _data->qvel[16] = vel(1);
+    _data->qvel[17] = vel(2);
 }
 
 m_pose MujocoController::returnBodyState(int bodyId){
     m_pose bodyPose;
 
     // TODO extend this to work with rotations also, whether its quaternions or euler angles
-    for(int i = 0; i < 3; i++){
-        bodyPose(i) = _data->xpos[(bodyId * 3) + i];
-    }
+//    for(int i = 0; i < 3; i++){
+//        bodyPose(i) = _data->qpos[(bodyId * 3) + i];
+//    }
+
+    // X position of cube
+    bodyPose(0) = _data->qpos[16];
+    // Y position of cube
+    bodyPose(1) = _data->qpos[17];
+    // Z position of cube
+    bodyPose(2) = _data->qpos[18];
+
+//    for(int i = 0; i < _model->nv; i++){
+//        cout << "index " << i << ": " << _data->qpos[i] << endl;
+//    }
+
 
     return bodyPose;
 }
 
+m_pose MujocoController::returnBodyVelocities(int bodyId){
+    m_pose bodyVels;
+
+    bodyVels(0) = _data->qvel[15];
+    bodyVels(1) = _data->qvel[16];
+    bodyVels(2) = _data->qvel[17];
+
+    return bodyVels;
+}
 
 
-void MujocoController::setRobotConfiguration(const Ref<const VectorXf> configuration) {
+
+void MujocoController::setRobotConfiguration(const Ref<const m_dof> configuration) {
 
     for (int i = 0; i < NUM_JOINTS; i++) {
         _data->qpos[i] = configuration(i);
@@ -120,8 +167,8 @@ void MujocoController::setRobotConfiguration(const Ref<const VectorXf> configura
     mj_forward(model, _data);
 }
 
-ArrayXf MujocoController::returnRobotConfiguration(){
-    ArrayXf robotConfig(7);
+m_dof MujocoController::returnRobotConfiguration(){
+    m_dof robotConfig;
 
     for(int i = 0; i < NUM_JOINTS; i++){
         robotConfig(i) = _data->qpos[i];
@@ -129,28 +176,28 @@ ArrayXf MujocoController::returnRobotConfiguration(){
     return robotConfig;
 }
 
-void MujocoController::setRobotVelocities(const Ref<const VectorXf> jointVelocities){
+void MujocoController::setRobotVelocities(const Ref<const m_dof> jointVelocities){
     for (int i = 0; i < NUM_JOINTS; i++) {
         _data->qvel[i] = jointVelocities(i);
     }
 }
 
-ArrayXf MujocoController::returnRobotVelocities(){
-    ArrayXf robotVelocities(7);
+m_dof MujocoController::returnRobotVelocities(){
+    m_dof robotVelocities;
     for(int i = 0; i < NUM_JOINTS; i++){
         robotVelocities(i) = _data->qvel[i];
     }
     return robotVelocities;
 }
 
-void MujocoController::setRobotAccelerations(const Ref<const VectorXf> jointAccelerations){
+void MujocoController::setRobotAccelerations(const Ref<const m_dof> jointAccelerations){
     for (int i = 0; i < NUM_JOINTS; i++) {
         _data->qacc[i] = jointAccelerations(i);
     }
 }
 
-ArrayXf MujocoController::returnRobotAccelerations(){
-    ArrayXf jointAccelerations(NUM_JOINTS);
+m_dof MujocoController::returnRobotAccelerations(){
+    m_dof jointAccelerations;
     for(int i = 0; i < NUM_JOINTS; i++){
         jointAccelerations(i) = _data->qacc[i];
     }

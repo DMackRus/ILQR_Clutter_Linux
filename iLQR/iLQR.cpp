@@ -10,6 +10,7 @@ PIDController positionPID[NUM_JOINTS];
 m_dof desiredJointAngles;
 
 m_dof* controlSequence;
+m_dof* initControls;
 m_dof lastControl;
 int controlCounter = 0;
 int numControlsPerTrajectory;
@@ -20,6 +21,8 @@ pose desiredEndEffectorPos;
 pose startEndEffectorPos;
 pose diffPoseStartDesired;
 Vector3d linearInterpolationDesiredForce;
+
+bool initControlShown = true;
 
 extern MujocoController *globalMujocoController;
 
@@ -38,7 +41,7 @@ ofstream outputDiffDyn;
 
 std::string diffDynFilename = "diffDyn.csv";
 
-#define TEST_LINEARISATION 1
+#define TEST_LINEARISATION 0
 
 void iLQR(m_state X0, m_dof *U, m_state *X){
     bool optimisationFinished = false;
@@ -106,12 +109,35 @@ void iLQR(m_state X0, m_dof *U, m_state *X){
     }
 }
 
+void simpleTest(){
+    controlState = ilqrSim;
+    m_state X0;
+    X0 << -0.564, -0.6779, 0.445, -2.45, 0.297, 0.242, -0.297,
+            0, 0, 0, 0, 0, 0, 0,
+            0.41, 0, 0, 0;
+
+
+    globalMujocoController->setSystemState(X0);
+    globalMujocoController->saveMujocoState();
+    globalMujocoController->saveMujocoState();
+    globalMujocoController->loadSimulationState(0);
+    initControls = new m_dof[numControls];
+    warmStartControls(initControls, X0);
+    iLQRSetControlSequence(initControls, numControls);
+    mujocoTimesStepsPerControl = mujoco_steps_per_dt;
+    numControlsPerTrajectory = numControls;
+    globalMujocoController->loadSimulationState(0);
+
+    controlState = simulating;
+
+}
+
 void testILQR(){
     controlState = ilqrSim;
-    VectorXf X0(NUM_STATES);
+    m_state X0;
     X0 << -0.564, -0.678, 0.445, -2.45, 0.297, 0.242, -0.297,
             0, 0, 0, 0, 0, 0, 0,
-            0.41, 0;
+            0.41, 0, 0, 0;
     //0.41 start for cube
 
     initCostMatrices();
@@ -123,9 +149,14 @@ void testILQR(){
     globalMujocoController->saveMujocoState();
     globalMujocoController->loadSimulationState(0);
 
-    m_dof *initControls = new m_dof[numControls];
+    initControls = new m_dof[numControls];
+    m_dof *finalControls = new m_dof[numControls];
 
     warmStartControls(initControls, X0);
+
+    for(int i = 0; i < numControls; i++){
+        finalControls[i] = initControls[i];
+    }
 
 //    for(int i = numControls/2; i < numControls; i++){
 //        for(int j = 0; j < DOF; j++){
@@ -138,13 +169,9 @@ void testILQR(){
     X_lin[0] = X0;
     X_dyn[0] = X0;
 
-
-
     globalMujocoController->loadSimulationState(0);
     controlState = ilqrSim;
 
-    MatrixXf A = ArrayXXf::Zero(NUM_STATES, NUM_STATES);
-    MatrixXf B = ArrayXXf::Zero(NUM_STATES, DOF);
     m_state _;
 
 //    for(int i = 0; i < 5; i ++){
@@ -155,47 +182,72 @@ void testILQR(){
 //    }
 
     m_state diff;
-    float sumDiff[16] = {0};
+    float sumDiff[18] = {0};
+    MatrixXd A_last = ArrayXXd::Zero(NUM_STATES, NUM_STATES);
+    MatrixXd B_last = ArrayXXd::Zero(NUM_STATES, DOF);
 
     if(TEST_LINEARISATION){
         for(int i = 0;  i < numControls; i++){
             //globalMujocoController->setSystemState(X_dyn[i]);
+            MatrixXd A = ArrayXXd::Zero(NUM_STATES, NUM_STATES);
+            MatrixXd B = ArrayXXd::Zero(NUM_STATES, DOF);
             globalMujocoController->deleteLastMujocoState();
             globalMujocoController->saveMujocoState();
             lineariseDynamics(X_dyn[i], initControls[i], A, B);
+//            if(!checkValidAandBMatrices(A, B)){
+//                A = A_last;
+//                B = B_last;
+//            }
             stepSimulation(X_dyn[i], initControls[i], X_dyn[i+1], _, mujoco_steps_per_dt);
 
-//        cout << "------------------- x dynamic ---------------------" << endl;
-//        cout << X_dyn[i+1] << endl;
-//        A *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
-//        B *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
-//        cout << "------------------------- A ------------------- " << endl;
-//        cout << A << endl;
-//        cout << "------------------------- B ------------------- " << endl;
-//        cout << B << endl;
 
             m_state xdot_lin;
             m_state actual_x_dot;
-            X_lin[i+1] = ((A * X_dyn[i]) + (B * initControls[i]));
+
+            m_state_state A_dt;
+            m_state_dof B_dt;
+            scaleLinearisation(A, B, A_dt, B_dt, mujoco_steps_per_dt);
+
+            X_lin[i+1] = (A_dt * X_dyn[i]) + (B_dt * initControls[i]);
+
+
+//            m_state A_temp = (A * X_dyn[i]);
+//            m_state B_temp = (B * initControls[i]);
+//            //cout << "A part is: " << endl << A_temp << endl;
+//            //cout << "b part is: " << endl << B_temp << endl;
             actual_x_dot = X_dyn[i+1] - X_dyn[i];
             xdot_lin = X_lin[i+1] - X_lin[i];
-//        cout << "xdot was: " << endl;
-//        cout << xdot_lin << endl;
-//        cout << "actual x dot was: " << endl;
-//        cout << actual_x_dot << endl;
-            //X_lin[i+1] = X_lin[i] + xdot_lin;
-            diff = X_dyn[i] - X_lin[i];
-            for(int  j = 0; j < 16; j++){
+            cout << "xdot linearising was: " << endl;
+            cout << xdot_lin << endl;
+            cout << "xdot from dynamics was: " << endl;
+            cout << actual_x_dot << endl;
+            cout << "A" << endl << A_dt << endl;
+            cout << "B" << endl << B_dt << endl;
+
+            diff = actual_x_dot - xdot_lin;
+            for(int j = 0; j < NUM_STATES; j++){
+                if(diff(j) > 1){
+                    cout << "index: " << j << endl;
+                    int a = 1;
+                }
+                if(diff(j) < -1){
+                    cout << "index: " << j << endl;
+                    int a = 1;
+                }
+            }
+
+            for(int  j = 0; j < 18; j++){
                 sumDiff[j] += pow((X_dyn[i](j) - X_lin[i](j)), 2);
 
             }
             int a = 1;
-
+            A_last = A;
+            B_last = B;
         }
 
         cout << "sum squared diff at end: " << endl;
         float totalBadness = 0.0f;
-        for(int i = 0; i < 16; i++){
+        for(int i = 0; i < 18; i++){
             cout << sumDiff[i] << " "  << endl;
             totalBadness += sumDiff[i];
         }
@@ -206,20 +258,20 @@ void testILQR(){
     globalMujocoController->loadSimulationState(0);
     auto iLQRStart = high_resolution_clock::now();
 
-    iLQR(X0, initControls, X_dyn);
+    iLQR(X0, finalControls, X_dyn);
 
     auto iLQRStop = high_resolution_clock::now();
     auto iLQRDur = duration_cast<microseconds>(iLQRStop - iLQRStart);
 
     cout << "iLQR took " << iLQRDur.count()/1000000 << " seconds" << endl;
 
-    saveTrajecToCSV(initControls, X_dyn);
+    saveTrajecToCSV(finalControls, X_dyn);
 
     // reset simulation
     // save control sequence to mujoco controller class
     // untick ilqractive
     globalMujocoController->loadSimulationState(0);
-    iLQRSetControlSequence(initControls, numControls);
+    iLQRSetControlSequence(finalControls, numControls);
     controlState = simulating;
     mujocoTimesStepsPerControl = mujoco_steps_per_dt;
     numControlsPerTrajectory = numControls;
@@ -375,6 +427,7 @@ bool poseAchieved(pose desiredPose, pose currentPose){
 void myController(const mjModel *m, mjData *d){
     m_dof nextControl;
 
+
     if(controlState == ilqrSim){
         nextControl = nextControlSequence;
         for(int i = 0; i < NUM_JOINTS; i++) {
@@ -383,11 +436,16 @@ void myController(const mjModel *m, mjData *d){
     }
 
     else if(controlState == simulating){
-        nextControl = controlSequence[controlCounter];
+
+        if(initControlShown){
+            nextControl = initControls[controlCounter];
+        }
+        else{
+            nextControl = controlSequence[controlCounter];
+        }
 
         for(int i = 0; i < NUM_JOINTS; i++){
             d->ctrl[i] = controlSequence[controlCounter](i);
-
         }
 
         mujocoTimeStepCounter++;
@@ -401,6 +459,7 @@ void myController(const mjModel *m, mjData *d){
             controlCounter = 0;
             globalMujocoController->resetSimFlag = true;
             m_state endState = globalMujocoController->returnSystemState();
+            //initControlShown = 1 - initControlShown;
         }
     }
 
@@ -468,6 +527,21 @@ void myController(const mjModel *m, mjData *d){
             d->ctrl[i] = d->qfrc_bias[i];
             nextControl(i) = d->ctrl[i];
         }
+////        m_pose desiredVel;
+////        desiredVel(0) = 0;
+////        desiredVel(1) = 0;
+////        desiredVel(2) = 0.1;
+//        int boxId = globalMujocoController->returnModelID("box_obstacle_1");
+////        globalMujocoController->setBodyVel(boxId, desiredVel);
+//        m_pose boxPose = globalMujocoController->returnBodyState(boxId);
+//        m_pose boxVels = globalMujocoController->returnBodyVelocities(boxId);
+//        cout << "box pose returned: " << boxPose << endl;
+//
+//
+//        // Setting the x and y position to the desired state
+//        boxPose(2) += 0.01;
+//        cout << "pos counter: " << boxPose(0) << endl;
+//        globalMujocoController->setBodyState(boxId, boxPose, boxVels);
     }
     else{
 

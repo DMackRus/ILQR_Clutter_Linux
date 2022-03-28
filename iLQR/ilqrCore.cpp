@@ -28,12 +28,15 @@ float lamb = 0.1;
 int numIterations = 0;
 float oldCost;
 
+m_state_state A_last;
+m_state_dof B_last;
+
 void differentiateDynamics(m_state *X, m_dof *U, m_state_state *f_x, m_state_dof *f_u, float *l, m_state *l_x, m_state_state *l_xx, m_dof *l_u, m_dof_dof *l_uu){
 
-    MatrixXf I(NUM_STATES, NUM_STATES);
+    MatrixXd I(NUM_STATES, NUM_STATES);
     I.setIdentity(NUM_STATES, NUM_STATES);
-    MatrixXf A = ArrayXXf::Zero(NUM_STATES, NUM_STATES);
-    MatrixXf B = ArrayXXf::Zero(NUM_STATES, DOF);
+    MatrixXd A = ArrayXXd::Zero(NUM_STATES, NUM_STATES);
+    MatrixXd B = ArrayXXd::Zero(NUM_STATES, DOF);
     // Linearise the dynamics
     for(int t = 0; t < numControls; t++){
         // Calculate linearised dynamics for current time step via finite differencing
@@ -42,13 +45,21 @@ void differentiateDynamics(m_state *X, m_dof *U, m_state_state *f_x, m_state_dof
         globalMujocoController->saveMujocoState();
         lineariseDynamics(X[t], U[t], A, B);
 
-//        A *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
-//        B *= ((float)linearising_num_sim_steps / mujoco_steps_per_dt);
+        m_state_state A_dt;
+        m_state_dof B_dt;
+        scaleLinearisation(A, B, A_dt, B_dt,  mujoco_steps_per_dt);
 
-        f_x[t] = A;
-        f_u[t] = B;
+//        if(!checkValidAandBMatrices(A_dt, B_dt)){
+//            A_dt = A_last;
+//            B_dt = B_last;
+//        }
+        A_last = A_dt;
+        B_last = B_dt;
 
-        l[t] = immediateCostAndDerivitives(l_x[t], l_xx[t], l_u[t], l_uu[t], X[t], X[t+1], U[t]);
+        f_x[t] = A_dt;
+        f_u[t] = B_dt;
+
+        l[t] = immediateCostAndDerivitives(l_x[t], l_xx[t], l_u[t], l_uu[t], X[t], X[t+1], U[t], t);
 
         l[t]    *= dt;
         l_x[t]  *= dt;
@@ -66,11 +77,11 @@ void differentiateDynamics(m_state *X, m_dof *U, m_state_state *f_x, m_state_dof
 
     }
 
-    l[numControls] = terminalCost(l_x[numControls], l_xx[numControls], X[numControls]);
+    //l[numControls] = terminalCost(l_x[numControls], l_xx[numControls], X[numControls]);
 
-    l   [numControls] *= dt;
-    l_x [numControls] *= dt;
-    l_xx[numControls] *= dt;
+//    l   [numControls] *= dt;
+//    l_x [numControls] *= dt;
+//    l_xx[numControls] *= dt;
 }
 
 bool backwardsPass(m_state_state *f_x, m_state_dof *f_u, float l, m_state *l_x, m_state_state *l_xx, m_dof *l_u, m_dof_dof *l_uu, m_dof *k,  m_dof_state *K){
@@ -155,6 +166,10 @@ float forwardsPass(m_state *X, m_state *X_new, m_dof *U, m_dof *U_new, m_dof *k,
     int alphaSearchCount = 0;
     float newCost;
     float initialAlphaCost = 0.0f;
+    m_dof *U_best = new m_dof[numControls];
+    m_state *X_best = new m_state[numControls + 1];
+    int maxAlphaSearchDepth = 5;
+    X_best[0] = X[0];
 
     while(alphaLineSearch){
         m_state xnew(NUM_STATES);
@@ -193,24 +208,38 @@ float forwardsPass(m_state *X, m_state *X_new, m_dof *U, m_dof *U_new, m_dof *k,
 
         newAlphaCost = rollOutTrajectory(X[0], X_new, U_new, numControls);
 
+
         if(firstAlpha){
             firstAlpha = false;
 
             bestAlphaCost = newAlphaCost;
+            for(int i = 0; i < numControls; i++){
+                U_best[i] = U_new[i];
+                X_best[i] = X_new[i];
+            }
+
             initialAlphaCost = newAlphaCost;
             if(!alphaSearchEnabled){
                 break;
             }
             alpha /= 2;
+            alphaSearchCount++;
         }
         else{
             float costGrad = abs(newAlphaCost - bestAlphaCost);
             if(costGrad < 0.1){
                 alphaLineSearch = false;
             }
+            if(alphaSearchCount > maxAlphaSearchDepth){
+                alphaLineSearch = false;
+            }
             if(newAlphaCost < bestAlphaCost){
                 alpha = alpha - pow(0.5, alphaSearchCount + 1);
                 bestAlphaCost = newAlphaCost;
+                for(int i = 0; i < numControls; i++){
+                    U_best[i] = U_new[i];
+                    X_best[i] = X_new[i];
+                }
 
             }
             else{
@@ -222,12 +251,16 @@ float forwardsPass(m_state *X, m_state *X_new, m_dof *U, m_dof *U_new, m_dof *k,
     }
 
     newCost = bestAlphaCost;
+    for(int i = 0; i < numControls; i++){
+        U_new[i] = U_best[i];
+        X_new[i] = X_best[i];
+    }
 
     auto forwardPassStop = high_resolution_clock::now();
     auto forwardPassDur = duration_cast<microseconds>(forwardPassStop - forwardPassStart);
     float costImprovement = initialAlphaCost - newCost;
 
-    cout << "Forwards pass: " << forwardPassDur.count()/1000 << " milliseconds" << "num iterations: " << alphaSearchCount << "cost improvement: " << costImprovement << endl;
+    cout << "Forwards pass: " << forwardPassDur.count()/1000 << " milliseconds" << "num iterations: " << alphaSearchCount << " inital cost: " << initialAlphaCost << ", reduced cost: " << newCost  << ", cost improvement: " << costImprovement << endl;
     return newCost;
 }
 
@@ -251,12 +284,13 @@ bool checkForConvergence(float newCost, m_state *X, m_state *X_new, m_dof *U, m_
         std::cout << "New cost: " << newCost <<  std::endl;
         std::cout << "Terminal Cube Pos diff " << std::endl;
         m_state X_diff = X[numControls] - X_desired;
-        std::cout << "x pos diff: " << X_diff(14) << " z pos diff: " << X_diff(15) << std::endl;
+        std::cout << "x pos diff: " << X_diff(14) << " y pos diff: " << X_diff(15) << std::endl;
+        std::cout << "cube final pos x: " << X[numControls](14) << " y: " << X[numControls](15) << std::endl;
 
         numIterations++;
         float costGrad = (oldCost - newCost)/newCost;
 
-        if((numIterations > 1) && costGrad < epsConverge){
+        if((numIterations > 5) && costGrad < epsConverge){
             convergence = true;
             cout << "ilQR converged, num Iterations: " << numIterations << " final cost: " << newCost << endl;
         }
@@ -276,4 +310,41 @@ bool checkForConvergence(float newCost, m_state *X, m_state *X_new, m_dof *U, m_
 
 void increaseLamda(){
     lamb *= lamdaFactor;
+}
+
+bool checkValidAandBMatrices(m_state_state A, m_state_dof B){
+    bool validMatrices = true;
+    int rowCounter = 0;
+    int colCounter = 0;
+
+    // Check the 'A' matrix
+    while(rowCounter < NUM_STATES){
+        while(colCounter < NUM_STATES){
+            if(A(rowCounter, colCounter) > 5 || A(rowCounter, colCounter) < -5){
+                validMatrices = false;
+                break;
+            }
+            colCounter++;
+        }
+        colCounter = 0;
+        rowCounter++;
+    }
+
+    colCounter = 0;
+    rowCounter = 0;
+    // Check the 'B' matrix
+    while(rowCounter < NUM_STATES){
+        while(colCounter < DOF){
+            if(B(rowCounter, colCounter) > 5 || B(rowCounter, colCounter) < -5){
+                validMatrices = false;
+                break;
+            }
+            colCounter++;
+        }
+        colCounter = 0;
+        rowCounter++;
+    }
+
+
+    return validMatrices;
 }

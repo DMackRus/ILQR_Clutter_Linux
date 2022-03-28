@@ -14,7 +14,7 @@
 #include <vector>
 
 #define NUM_JOINTS 7
-#define NUM_STATES 16
+#define NUM_STATES 18
 // Theta 1 - 7, theta dot 1 - 7, x, z of cube
 
 using namespace Eigen;
@@ -38,13 +38,13 @@ struct config {
     double jointAngles[NUM_JOINTS];
 };
 
-typedef Vector<float, NUM_JOINTS> m_dof;
-typedef Vector<float, NUM_STATES> m_state;
-typedef Vector<float, 6> m_pose;
+typedef Vector<double, NUM_JOINTS> m_dof;
+typedef Vector<double, NUM_STATES> m_state;
+typedef Vector<double, 6> m_pose;
 
-typedef Matrix<float, NUM_STATES, NUM_STATES> m_state_state;
-typedef Matrix<float, NUM_STATES, NUM_JOINTS> m_state_dof;
-typedef Matrix<float, NUM_JOINTS, NUM_STATES> m_dof_state;
-typedef Matrix<float, NUM_JOINTS, NUM_JOINTS> m_dof_dof;
+typedef Matrix<double, NUM_STATES, NUM_STATES> m_state_state;
+typedef Matrix<double, NUM_STATES, NUM_JOINTS> m_state_dof;
+typedef Matrix<double, NUM_JOINTS, NUM_STATES> m_dof_state;
+typedef Matrix<double, NUM_JOINTS, NUM_JOINTS> m_dof_dof;
 
 #endif //MUJOCO_SANDBOX_STDINCLUDE_H

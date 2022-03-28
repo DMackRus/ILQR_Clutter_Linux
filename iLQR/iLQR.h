@@ -35,4 +35,6 @@ void warmStartControls(m_dof *U, Ref<m_state> X0);
 
 void saveStates(m_state *X_dyn, m_state *X_lin);
 
+void simpleTest();
+
 #endif //MUJOCO_SANDBOX_ILQR_H
